@@ -1,3 +1,6 @@
+# personal
+_project_gist/
+
 # Environments
 venv_dbt_port/
 .env
