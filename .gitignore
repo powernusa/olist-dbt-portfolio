@@ -1,0 +1,21 @@
+# Environments
+venv_dbt_port/
+.env
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# dbt
+logs/
+target/
+dbt_packages/
+
+# Data (Don't push huge Kaggle datasets to GitHub!)
+data_olist/*.csv
+data_olist/*.zip
+
+# OS
+.DS_Store
+EOF
