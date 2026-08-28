@@ -1,0 +1,27 @@
+name: "dbt_olist"
+version: "1.0.0"
+profile: "olist_portfolio"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets: # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+models:
+  dbt_olist:
+    # Staging Layer: Maps to models/staging/
+    staging:
+      +schema: staging # Routes target schema to OLIST_DEV.STAGING
+      +materialized: view # Materializes models as lightweight Views
+
+    marts:
+      logistics:
+        +schema: marts_logistics # Routes target schema to OLIST_DEV.MARTS_LOGISTICS
+        +materialized: table # Materializes models as physical Tables for fast querying
+
