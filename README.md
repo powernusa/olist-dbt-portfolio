@@ -1,6 +1,6 @@
 # Brazilian E-Commerce Analytics & ML Pipeline
 
-> 🚧 **Work in Progress:** This is an ongoing project. Target date of completion: **End of September 2026**.
+> 🚧 **Work in Progress:** This is an ongoing project. Target date of completion: **End of October 2026**.
 
 A containerized e-commerce data pipeline and machine learning workflow. Built with Snowflake, dbt, Dagster, and Docker, featuring predictive modeling and customer segmentation.
 
