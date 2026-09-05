@@ -1,0 +1,32 @@
+services:
+  # Service 1: Dagster Orchestrator UI
+  dagster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: olist_dagster
+    command: dagster dev -h 0.0.0.0 -p 3000 -f dagster_olist/olist_assets.py
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      # still need to add ssh
+    working_dir: /app
+
+  # Service 2: JupyterLab for EDA & Machine Learning
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: olist_jupyter
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''
+    ports:
+      - "8888:8888"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      # still need to add ssh
+    working_dir: /app
