@@ -1,20 +1,23 @@
 import os
 import snowflake.connector
 from dagster import asset, get_dagster_logger
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
-# Load environment variables (credentials, paths) from the local .env file
-load_dotenv()
+# ------------------------------------------------------------------------------
+# Environment Setup
+# ------------------------------------------------------------------------------
+# Automatically locate and load .env from current working dir (/app) or parent
+dotenv_path = find_dotenv(usecwd=True)
+if not dotenv_path:
+    dotenv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-'''
-This Dagster asset automates raw data ingestion into Snowflake using RSA key-pair authentication. 
-It loops through 9 local Olist CSV files, uploads them to Snowflake's internal table stages (PUT), 
-and bulk-loads the data into raw destination tables (COPY INTO).
-'''
+load_dotenv(dotenv_path)
 
-# Mapping dictionary: Maps local CSV file names to their corresponding target Snowflake raw table names
+# ------------------------------------------------------------------------------
+# Data & Table Mappings
+# ------------------------------------------------------------------------------
 FILE_TO_TABLE_MAP = {
     'olist_customers_dataset.csv': 'olist_customers',
     'olist_geolocation_dataset.csv': 'olist_geolocation',
@@ -27,41 +30,52 @@ FILE_TO_TABLE_MAP = {
     'product_category_name_translation.csv': 'product_category_name_translation'
 }
 
-def get_private_key(key_path):
+
+def get_private_key(key_path: str) -> bytes:
     """
-    Reads an encrypted or unencrypted PEM private key from disk and converts 
-    it into PKCS#8 DER-encoded bytes required by the Snowflake Python Connector.
+    Reads a PEM private key from disk and converts it into PKCS#8 DER-encoded bytes
+    required by the Snowflake Python Connector.
     """
+    if not os.path.exists(key_path):
+        raise FileNotFoundError(f"RSA Private Key file not found at path: {key_path}")
+
     with open(key_path, "rb") as key_file:
         p_key = serialization.load_pem_private_key(
             key_file.read(),
-            password=None,  # Set to passphrase string if private key is encrypted
+            password=None,
             backend=default_backend()
         )
     
-    # Export key as unencrypted PKCS#8 formatted DER bytes
-    pkb = p_key.private_bytes(
+    return p_key.private_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     )
-    return pkb
 
-@asset  # Registers this Python function as a Dagster Software-Defined Asset
+
+@asset
 def load_raw_olist_to_snowflake():
-    """Uploads local Olist CSVs to Snowflake internal stages and copies them into raw tables."""
-    
-    # Instantiate Dagster logger to print structured execution logs in Dagster UI
+    """
+    Uploads local Olist CSVs to Snowflake internal table stages and copies 
+    them into raw destination tables with full log feedback.
+    """
     logger = get_dagster_logger()
     
-    # Path where local raw CSV files reside
-    data_dir = '../data_olist'      # use relative path
+    # 1. Resolve absolute paths inside container (/app working directory)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    data_dir = os.path.join(base_dir, "data_olist")
     
-    # 1. Fetch private key path from environment and convert key to DER bytes
+    logger.info(f"Resolved Data Directory: {data_dir}")
+    
+    # 2. Resolve RSA Key path
     key_path = os.getenv('SNOWFLAKE_PRIVATE_KEY_PATH')
+    if key_path and not os.path.isabs(key_path):
+        key_path = os.path.abspath(os.path.join(base_dir, key_path))
+        
+    logger.info(f"Loading RSA Key from: {key_path}")
     private_key_bytes = get_private_key(key_path)
     
-    # 2. Establish connection to Snowflake using RSA key-pair authentication
+    # 3. Establish Snowflake Connection
     conn = snowflake.connector.connect(
         account=os.getenv('SNOWFLAKE_ACCOUNT'),
         user=os.getenv('SNOWFLAKE_USER'),
@@ -69,31 +83,30 @@ def load_raw_olist_to_snowflake():
         role=os.getenv('SNOWFLAKE_ROLE'),
         warehouse=os.getenv('SNOWFLAKE_WAREHOUSE'),
         database=os.getenv('SNOWFLAKE_DATABASE'),
-        schema=os.getenv('SNOWFLAKE_SCHEMA')
+        schema=os.getenv('SNOWFLAKE_SCHEMA'),
+        autocommit=True
     )
     
     cursor = conn.cursor()
+    files_processed = 0
     
     try:
-        # Iterate over each file-to-table mapping pair
         for filename, table_name in FILE_TO_TABLE_MAP.items():
             file_path = os.path.join(data_dir, filename)
             
-            # Skip file processing if CSV is missing from directory
+            # Verify file existence inside container
             if not os.path.exists(file_path):
-                logger.warning(f"File not found, skipping: {file_path}")
+                logger.error(f"SKIPPED: Missing file in container at {file_path}")
                 continue
                 
             logger.info(f"Processing {filename} -> {table_name}")
             
-            # PUT command: Staging step
-            # Uploads and auto-compresses local CSV file into table's internal stage (@%table_name)
+            # Step A: PUT file to internal table stage
             put_query = f"PUT 'file://{file_path}' @%{table_name} AUTO_COMPRESS=TRUE OVERWRITE=TRUE;"
-            cursor.execute(put_query)
+            put_res = cursor.execute(put_query).fetchall()
+            logger.info(f"PUT Status for {table_name}: {put_res}")
             
-            # COPY INTO command: Ingestion step
-            # Loads staged CSV contents into destination table using pre-configured file format.
-            # PURGE = TRUE automatically deletes staged file once ingestion completes.
+            # Step B: COPY INTO target table
             copy_query = f"""
             COPY INTO {table_name}
             FROM @%{table_name}
@@ -101,13 +114,16 @@ def load_raw_olist_to_snowflake():
             MATCH_BY_COLUMN_NAME = NONE
             PURGE = TRUE;
             """
-            cursor.execute(copy_query)
+            copy_res = cursor.execute(copy_query).fetchall()
+            logger.info(f"COPY Status for {table_name}: {copy_res}")
             
-            logger.info(f"Successfully loaded {table_name}")
-            
+            files_processed += 1
+
+        if files_processed == 0:
+            raise FileNotFoundError(f"No CSV files were processed. Check contents of {data_dir}")
+
     finally:
-        # Guarantee database cursor and connection close even if errors occur
         cursor.close()
         conn.close()
         
-    return "All raw Olist data loaded successfully."
+    return f"Successfully processed and loaded {files_processed}/{len(FILE_TO_TABLE_MAP)} tables into Snowflake."
