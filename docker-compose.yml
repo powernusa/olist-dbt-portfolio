@@ -12,7 +12,7 @@ services:
       - .env
     volumes:
       - .:/app
-      - /Users/leexin/.ssh:/Users/leexin/.ssh:ro
+      - ${LOCAL_SSH_PATH}:/Users/leexin/.ssh:ro
     working_dir: /app
 
   # Service 2: JupyterLab for EDA & Machine Learning
@@ -28,5 +28,5 @@ services:
       - .env
     volumes:
       - .:/app
-      - /Users/leexin/.ssh:/Users/leexin/.ssh:ro
+      - ${LOCAL_SSH_PATH}:/Users/leexin/.ssh:ro
     working_dir: /app
