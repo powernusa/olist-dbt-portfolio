@@ -62,7 +62,7 @@ SELECT
     milestone_name,
     milestone_timestamp,
     previous_milestone_timestamp,
-    -- PostgreSQL syntax for fractional hours with decimal precision
-    EXTRACT(EPOCH FROM (milestone_timestamp - previous_milestone_timestamp)) / 3600.0 AS hours_since_last_step
+    -- Snowflake native calculation for fractional hours
+    TIMESTAMPDIFF(SECOND, previous_milestone_timestamp, milestone_timestamp) / 3600.0 AS hours_since_last_step
 FROM event_sequencing
 ORDER BY order_id ASC, milestone_timestamp ASC
