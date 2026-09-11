@@ -4,6 +4,7 @@ _practice/
 my_*
 .dbt/
 .ssh/
+download_data/
 
 # Environments
 venv_dbt_port/
