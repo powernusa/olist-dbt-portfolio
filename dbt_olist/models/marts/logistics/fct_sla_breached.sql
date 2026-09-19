@@ -27,13 +27,15 @@ filtered_deliveries AS (
       AND r.review_score IS NOT NULL
 ),
 
+
 final AS (
+    -- 19 Sep 2026: Streamlining final and have to update upstream dbt too!
     SELECT
         order_id,
         customer_id,
-        order_purchase_at,
-        order_estimated_delivery_at,
-        order_delivered_customer_at,
+        --order_purchase_at,
+        --order_estimated_delivery_at,
+        --order_delivered_customer_at,
         
         -- PostgreSQL date subtraction returning integer days
         (order_delivered_customer_at::DATE - order_estimated_delivery_at::DATE) AS sla_delay_days,
