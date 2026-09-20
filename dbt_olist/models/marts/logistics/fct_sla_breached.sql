@@ -13,8 +13,6 @@ reviews AS (
 filtered_deliveries AS (
     SELECT
         o.order_id,
-        o.customer_id,
-        o.order_purchase_at,
         o.order_estimated_delivery_at,
         o.order_delivered_customer_at,
         r.review_score
@@ -31,21 +29,14 @@ filtered_deliveries AS (
 final AS (
     -- 19 Sep 2026: Streamlining final and have to update upstream dbt too!
     SELECT
-        order_id,
-        customer_id,
-        --order_purchase_at,
-        --order_estimated_delivery_at,
-        --order_delivered_customer_at,
-        
+        order_id,        
         -- PostgreSQL date subtraction returning integer days
         (order_delivered_customer_at::DATE - order_estimated_delivery_at::DATE) AS sla_delay_days,
-
         -- Flag as breached if delivered strictly after estimated date
         CASE 
             WHEN (order_delivered_customer_at::DATE - order_estimated_delivery_at::DATE) > 0 THEN 1 
             ELSE 0 
         END AS is_sla_breached,
-        
         review_score
     FROM filtered_deliveries
 )

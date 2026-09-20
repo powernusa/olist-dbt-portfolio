@@ -1,6 +1,7 @@
 # Data Transformation Engine
 dbt-core>=1.12.0,<2.0.0
 dbt-snowflake>=1.12.0,<2.0.0
+dbt-duckdb  # Optional: Add if running dbt against a local DuckDB engine
 
 # Orchestration & Integration
 dagster
@@ -21,6 +22,7 @@ seaborn
 jupyterlab
 
 # Database & Data Ingestion
+duckdb>=1.0.0
 snowflake-connector-python>=4.7.0
 psycopg2-binary
 kaggle
