@@ -15,7 +15,7 @@ WORKDIR /app
 # COPY requirements.txt .
 COPY requirements.txt /app
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --no-binary psutil -r requirements.txt
+    pip install --no-cache-dir --no-binary p  nm mnsutil -r requirements.txt
 
 # Copy the rest of the project source code
 # COPY <source_on_host> <destination_in_container>
